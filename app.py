@@ -217,7 +217,7 @@ def page_descriptive(df, filtered_df):
                      color="C_confusion_level_label",
                      title="Education Level vs Career Clarity",
                      labels={"A_education_level":"Education Level","C_confusion_level_label":"Clarity Level"},
-                     color_discrete_sequence=px.colors.sequential.RdYlGn_r,
+                     color_discrete_sequence=["#1D9E75","#5DCAA5","#EF9F27","#D85A30","#E24B4A"],
                      barmode="stack")
         fig.update_layout(height=350)
         st.plotly_chart(fig, use_container_width=True)
@@ -293,22 +293,23 @@ def page_diagnostic(df, filtered_df):
 
     c5, c6 = st.columns(2)
     with c5:
-        streams = filtered_df["A_stream"].dropna().unique().tolist()
-        domains = filtered_df["E_career_domain_1"].dropna().unique().tolist()
         sankey_data = filtered_df.groupby(["A_stream","E_career_domain_1"]).size().reset_index(name="count")
-        sankey_data = sankey_data[sankey_data["count"] >= 5]
-        all_nodes = list(set(sankey_data["A_stream"].tolist() + sankey_data["E_career_domain_1"].tolist()))
-        node_idx = {n: i for i, n in enumerate(all_nodes)}
-        fig = go.Figure(go.Sankey(
-            node=dict(label=all_nodes, color=PALETTE[:len(all_nodes)], pad=15, thickness=20),
-            link=dict(
-                source=[node_idx[s] for s in sankey_data["A_stream"]],
-                target=[node_idx[d] for d in sankey_data["E_career_domain_1"]],
-                value=sankey_data["count"].tolist()
-            )
-        ))
-        fig.update_layout(title="Stream → Career Domain Interest (Sankey)", height=400, font_size=11)
-        st.plotly_chart(fig, use_container_width=True)
+        sankey_data = sankey_data[sankey_data["count"] >= 3]
+        if len(sankey_data) == 0:
+            st.info("Not enough data for Sankey diagram with current filters.")
+        else:
+            all_nodes = list(dict.fromkeys(sankey_data["A_stream"].tolist() + sankey_data["E_career_domain_1"].tolist()))
+            node_idx = {n: i for i, n in enumerate(all_nodes)}
+            fig = go.Figure(go.Sankey(
+                node=dict(label=all_nodes, color=[PALETTE[i % len(PALETTE)] for i in range(len(all_nodes))], pad=15, thickness=20),
+                link=dict(
+                    source=[node_idx[s] for s in sankey_data["A_stream"]],
+                    target=[node_idx[d] for d in sankey_data["E_career_domain_1"]],
+                    value=sankey_data["count"].tolist()
+                )
+            ))
+            fig.update_layout(title="Stream to Career Domain Interest (Sankey)", height=400, font_size=11)
+            st.plotly_chart(fig, use_container_width=True)
 
     with c6:
         dm_adoption = filtered_df.groupby(["C_family_decision_authority","F_will_use_platform"]).size().reset_index(name="Count")
@@ -495,10 +496,11 @@ def page_clustering(df, models):
 
     c5, c6 = st.columns(2)
     with c5:
-        fig = px.bar(top_rules.head(15), x="Lift", y=top_rules.head(15).index.astype(str),
-                     orientation="h", color="Lift", color_continuous_scale="Oranges",
+        top15 = top_rules.head(15).copy().reset_index(drop=True)
+        top15["Rule"] = [f"Rule {i+1}" for i in range(len(top15))]
+        fig = px.bar(top15, x="Lift", y="Rule", orientation="h",
+                     color="Lift", color_continuous_scale="Oranges",
                      title="Top 15 Rules by Lift")
-        fig.update_yaxes(ticktext=[f"Rule {i}" for i in range(15)], tickvals=list(range(15)))
         fig.update_layout(height=420, coloraxis_showscale=False)
         st.plotly_chart(fig, use_container_width=True)
 
